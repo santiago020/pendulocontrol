@@ -6,141 +6,126 @@
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-background: #bf4150;
-background: radial-gradient(circle, rgba(191, 65, 80, 1) 0%, rgba(0, 0, 0, 1) 100%);
-      color: #e6edf3;
-      font-family: 'Segoe UI', sans-serif;
-      text-align: center;
-      padding: 20px;
+    body{
+      background:#bf4150;
+      background:radial-gradient(circle, rgba(191,65,80,1) 0%, rgba(0,0,0,1) 100%);
+      color:#e6edf3; font-family:'Segoe UI',sans-serif; text-align:center; padding:20px;
     }
-    h1 {
-      color: #000000;
-      margin-bottom: 10px;
-    }
-    .status {
-      margin-bottom: 10px;
-      font-size: 15px;
-    }
-    canvas {
-      background-color: #161b22;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.5);
-      margin-top: 20px;
-    }
-    #lastValue {
-      font-size: 22px;
-      font-weight: bold;
-      margin-top: 15px;
-      color: #000000;
-    }
+    h1{ color:#000; margin-bottom:10px; }
+    .status{ margin-bottom:10px; font-size:15px; }
+    canvas{ background:#161b22; border-radius:12px; box-shadow:0 0 10px rgba(0,0,0,0.5); margin-top:20px; }
+    #lastValue{ font-size:22px; font-weight:bold; margin-top:15px; color:#000; }
+    .logo{ position:fixed; top:10px; left:10px; width:120px; }
   </style>
 </head>
 <body>
+  <!-- LOGO: fuera del <script> y fijo en esquina superior izquierda -->
+  <img class="logo"
+       src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png"
+       alt="Logo UMNG">
+
   <h1>PENDULO CONTROL</h1>
   <div class="status" id="status">Conectando</div>
   <div id="lastValue">Último θ: -- °</div>
   <canvas id="chart" width="600" height="300"></canvas>
-  <script>
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png" 
-     alt="Logo UMNG" 
-     style="position: absolute; top: 10px; left: 10px; width: 120px;">
-    // ---- Configuración MQTT ----
-    const broker = "wss://broker.hivemq.com:8884/mqtt";
-    const topic = "pendulo/esp32/imu";
 
-    const client = mqtt.connect(broker);
-    const statusEl = document.getElementById("status");
+  <script>
+    // ---- Configuración MQTT (mejor estabilidad) ----
+    const broker = "wss://broker.hivemq.com:8884/mqtt";
+    const topic  = "pendulo/esp32/imu";
+    const client = mqtt.connect(broker, {
+      clientId: "pendulo-" + Math.random().toString(16).slice(2),
+      clean: true,
+      reconnectPeriod: 2000,
+      connectTimeout: 30000,
+      keepalive: 30
+    });
+
+    const statusEl  = document.getElementById("status");
     const lastValEl = document.getElementById("lastValue");
 
     client.on("connect", () => {
-      statusEl.textContent = "🟢 Conectado ";
+      statusEl.textContent = "🟢 Conectado";
       client.subscribe(topic);
     });
+    client.on("reconnect", () => { statusEl.textContent = "🟡 Reintentando…"; });
+    client.on("error", (err) => { statusEl.textContent = "🔴 Error: " + err.message; });
 
-    client.on("error", (err) => {
-      statusEl.textContent = "🔴 Error de conexión: " + err.message;
-    });
-
-    // ---- Configuración del gráfico ----
+    // ---- Chart.js ----
     const ctx = document.getElementById("chart").getContext("2d");
-    const data = {
-      labels: [],
-      datasets: [{
-        label: "Ángulo (°)",
-        data: [],
-        borderColor: "#58a6ff",
-        borderWidth: 2,
-        pointRadius: 0,
-        fill: false,
-        tension: 0.15
-      }]
-    };
+    const data = { labels: [], datasets: [{
+      label: "Ángulo (°)",
+      data: [],
+      borderColor: "#58a6ff",
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false,
+      tension: 0.15
+    }]};
 
     const chart = new Chart(ctx, {
       type: "line",
-      data: data,
+      data,
       options: {
         responsive: true,
         animation: false,
         plugins: {
-          legend: {
-            labels: { color: "#e6edf3" }
-          }
+          legend: { labels: { color: "#e6edf3" } },
+          decimation: { enabled: true, algorithm: "lttb", samples: 200 } // ↓ menos carga
         },
+        parsing: false,
+        normalized: true,
         scales: {
-          x: {
-            title: { display: true, text: "Tiempo (s)", color: "#e6edf3" },
-            ticks: { color: "#aaa" },
-            grid: { color: "#30363d" }
-          },
-          y: {
-            title: { display: true, text: "Ángulo (°)", color: "#e6edf3" },
-            min: -50, max: 50,
-            ticks: { color: "#aaa" },
-            grid: { color: "#30363d" }
-          }
+          x: { title: { display: true, text: "Tiempo (s)", color: "#e6edf3" },
+               ticks: { color: "#aaa" }, grid: { color: "#30363d" } },
+          y: { title: { display: true, text: "Ángulo (°)", color: "#e6edf3" },
+               min: -50, max: 50, ticks: { color: "#aaa" }, grid: { color: "#30363d" } }
         }
       }
     });
 
-    // ---- Actualización del gráfico ----
+    // ---- Actualización eficiente del gráfico ----
     let t0 = Date.now();
+    const MAX_POINTS = 300;          // límite de puntos en buffer
+    const MIN_DT_MS  = 50;           // refresco máx ~20 Hz
+    let lastPlotMs   = 0;
+    let pendingFrame = false;
 
-    function updateChart(value) {
-      const t = (Date.now() - t0) / 1000;
+    function scheduleUpdate(){
+      if (pendingFrame) return;
+      pendingFrame = true;
+      requestAnimationFrame(() => {
+        chart.update("none");        // sin animación
+        pendingFrame = false;
+      });
+    }
+
+    function pushPoint(value){
+      const now = Date.now();
+      if (now - lastPlotMs < MIN_DT_MS) return; // throttle visual
+
+      const t = (now - t0) / 1000;
       data.labels.push(t.toFixed(1));
       data.datasets[0].data.push(value);
 
-      if (data.labels.length > 100) {
-        data.labels.shift();
-        data.datasets[0].data.shift();
+      if (data.labels.length > MAX_POINTS) {
+        data.labels.splice(0, data.labels.length - MAX_POINTS);
+        data.datasets[0].data.splice(0, data.datasets[0].data.length - MAX_POINTS);
       }
 
-      chart.update();
+      scheduleUpdate();
+      lastPlotMs = now;
     }
 
     // ---- Recepción MQTT ----
-    client.on("message", (topic, message) => {
+    client.on("message", (_topic, message) => {
       const text = message.toString().trim();
       const value = parseFloat(text);
-
-      if (!isNaN(value)) {
-        updateChart(value);
+      if (Number.isFinite(value)) {
         lastValEl.textContent = `Último θ: ${value.toFixed(2)} °`;
-      } else {
-        console.warn("Dato no numérico:", text);
+        pushPoint(value);
       }
     });
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
