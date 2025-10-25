@@ -2,30 +2,43 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Dashboard Péndulo Invertido</title>
+  <title>Péndulo Invertido — ESP32 MQTT</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f6f6f6;
+      background-color: #0d1117;
+      color: #e6edf3;
+      font-family: 'Segoe UI', sans-serif;
       text-align: center;
-      margin-top: 30px;
+      padding: 20px;
     }
-    h2 { color: #222; }
-    #status { font-weight: bold; margin-bottom: 10px; }
+    h1 {
+      color: #58a6ff;
+      margin-bottom: 10px;
+    }
+    .status {
+      margin-bottom: 10px;
+      font-size: 15px;
+    }
     canvas {
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      background-color: #161b22;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
       margin-top: 20px;
+    }
+    #lastValue {
+      font-size: 22px;
+      font-weight: bold;
+      margin-top: 15px;
+      color: #00ffb7;
     }
   </style>
 </head>
 <body>
-  <h2>📡 Dashboard — Ángulo del Péndulo Invertido</h2>
-  <div id="status">Conectando al broker MQTT...</div>
+  <h1>📡 Dashboard del Péndulo Invertido</h1>
+  <div class="status" id="status">Conectando a HiveMQ...</div>
+  <div id="lastValue">Último θ: -- °</div>
   <canvas id="chart" width="600" height="300"></canvas>
 
   <script>
@@ -35,14 +48,15 @@
 
     const client = mqtt.connect(broker);
     const statusEl = document.getElementById("status");
+    const lastValEl = document.getElementById("lastValue");
 
     client.on("connect", () => {
-      statusEl.innerText = "🟢 Conectado a HiveMQ";
+      statusEl.textContent = "🟢 Conectado a HiveMQ (broker.hivemq.com)";
       client.subscribe(topic);
     });
 
     client.on("error", (err) => {
-      statusEl.innerText = "🔴 Error de conexión: " + err.message;
+      statusEl.textContent = "🔴 Error de conexión: " + err.message;
     });
 
     // ---- Configuración del gráfico ----
@@ -52,7 +66,7 @@
       datasets: [{
         label: "Ángulo (°)",
         data: [],
-        borderColor: "blue",
+        borderColor: "#58a6ff",
         borderWidth: 2,
         pointRadius: 0,
         fill: false,
@@ -66,15 +80,22 @@
       options: {
         responsive: true,
         animation: false,
+        plugins: {
+          legend: {
+            labels: { color: "#e6edf3" }
+          }
+        },
         scales: {
           x: {
-            title: { display: true, text: "Tiempo (s)" },
-            ticks: { color: "#444" }
+            title: { display: true, text: "Tiempo (s)", color: "#e6edf3" },
+            ticks: { color: "#aaa" },
+            grid: { color: "#30363d" }
           },
           y: {
-            title: { display: true, text: "Ángulo (°)" },
+            title: { display: true, text: "Ángulo (°)", color: "#e6edf3" },
             min: -50, max: 50,
-            ticks: { color: "#444" }
+            ticks: { color: "#aaa" },
+            grid: { color: "#30363d" }
           }
         }
       }
@@ -88,7 +109,6 @@
       data.labels.push(t.toFixed(1));
       data.datasets[0].data.push(value);
 
-      // Mantener últimos 100 puntos
       if (data.labels.length > 100) {
         data.labels.shift();
         data.datasets[0].data.shift();
@@ -97,15 +117,14 @@
       chart.update();
     }
 
-    // ---- Recepción de mensajes MQTT ----
+    // ---- Recepción MQTT ----
     client.on("message", (topic, message) => {
       const text = message.toString().trim();
       const value = parseFloat(text);
 
-      console.log("Mensaje recibido:", text);
-
       if (!isNaN(value)) {
         updateChart(value);
+        lastValEl.textContent = `Último θ: ${value.toFixed(2)} °`;
       } else {
         console.warn("Dato no numérico:", text);
       }
