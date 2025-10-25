@@ -11,7 +11,7 @@
       color: #e6edf3;
       font-family: 'Segoe UI', sans-serif;
       text-align: center;
-      padding-top: 120px; /* espacio para el logo */
+      padding-top: 140px; /* espacio para el logo fijo */
       margin: 0;
     }
     h1 {
@@ -34,26 +34,21 @@
       margin-top: 15px;
       color: #000000;
     }
-    .logo-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      background: rgba(0,0,0,0.6);
-      text-align: left;
-      padding: 10px 20px;
-      z-index: 100;
-    }
-    .logo-container img {
+    /* --- Logo fijo arriba --- */
+    .logo-fixed {
+      position: absolute;
+      top: 10px;
+      left: 10px;
       width: 120px;
+      z-index: 10;
     }
   </style>
 </head>
 <body>
-  <div class="logo-container">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png"
-         alt="Logo UMNG">
-  </div>
+  <!-- Logo fijo UMNG -->
+  <img class="logo-fixed" 
+       src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png" 
+       alt="Logo UMNG">
 
   <h1>PÉNDULO CONTROL</h1>
   <div class="status" id="status">Conectando...</div>
@@ -78,7 +73,7 @@
       statusEl.textContent = "🔴 Error de conexión: " + err.message;
     });
 
-    // ---- Gráfico ----
+    // ---- Configuración del gráfico ----
     const ctx = document.getElementById("chart").getContext("2d");
     const data = {
       labels: [],
@@ -98,15 +93,26 @@
       data: data,
       options: {
         animation: false,
-        plugins: { legend: { labels: { color: "#e6edf3" } } },
+        plugins: {
+          legend: { labels: { color: "#e6edf3" } }
+        },
         scales: {
-          x: { ticks: { color: "#aaa" }, grid: { color: "#30363d" }, title: { display: true, text: "Tiempo (s)", color: "#e6edf3" } },
-          y: { ticks: { color: "#aaa" }, grid: { color: "#30363d" }, min: -50, max: 50, title: { display: true, text: "Ángulo (°)", color: "#e6edf3" } }
+          x: {
+            title: { display: true, text: "Tiempo (s)", color: "#e6edf3" },
+            ticks: { color: "#aaa" },
+            grid: { color: "#30363d" }
+          },
+          y: {
+            title: { display: true, text: "Ángulo (°)", color: "#e6edf3" },
+            min: -50, max: 50,
+            ticks: { color: "#aaa" },
+            grid: { color: "#30363d" }
+          }
         }
       }
     });
 
-    // ---- Actualización ----
+    // ---- Actualización del gráfico ----
     let t0 = Date.now();
     function updateChart(value) {
       const t = ((Date.now() - t0) / 1000).toFixed(1);
@@ -120,6 +126,7 @@
       chart.update("none");
     }
 
+    // ---- Recepción de datos MQTT ----
     client.on("message", (topic, message) => {
       const val = parseFloat(message.toString());
       if (!isNaN(val)) {
