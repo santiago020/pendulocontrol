@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>MPU6050 Dashboard IoT</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    body{margin:0;background:#0f172a;color:#e2e8f0;font-family:Segoe UI,Roboto,Arial,sans-serif}
+    header{padding:16px 20px;border-bottom:1px solid #1f2937;background:#111827}
+    h1{margin:0;font-size:20px}
+    .wrap{max-width:1000px;margin:auto;padding:20px}
+    .card{background:#111827;border-radius:14px;padding:16px;margin-bottom:16px;border:1px solid #1f2937}
+    label{font-size:13px;color:#94a3b8}
+    input,button{width:100%;padding:8px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;margin-top:4px}
+    button{cursor:pointer;background:linear-gradient(135deg,#06b6d4,#22d3ee);color:#001018;font-weight:700}
+    .row{display:flex;flex-wrap:wrap;gap:12px}
+    .col{flex:1 1 200px;min-width:180px}
+    canvas{background:#0a1020;border-radius:10px}
+    .status{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;background:#1f2937;border-radius:999px}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .dot.ok{background:#22c55e}.dot.bad{background:#ef4444}.dot.idle{background:#f59e0b}
+    pre{background:#0b1220;padding:12px;border-radius:8px;overflow:auto;max-height:200px}
+  </style>
+</head>
+<body>
+  <header><h1>Dashboard IoT — Ángulo MPU6050</h1></header>
+  <div class="wrap">
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label>Host</label>
+          <input id="host" value="broker.hivemq.com">
+        </div>
+        <div class="col">
+          <label>Port</label>
+          <input id="port" type="number" value="8000">
+        </div>
+        <div class="col">
+          <label>Path</label>
+          <input id="path" value="/mqtt">
+        </div>
+        <div class="col">
+          <label>Topic</label>
+          <input id="topic" value="pendulo/esp32/imu">
+        </div>
+        <div class="col" style="max-width:150px">
+          <label>&nbsp;</label>
+          <button id="btnConnect">Conectar</button>
+        </div>
+        <div class="col" style="max-width:150px">
+          <label>&nbsp;</label>
+          <button id="btnDisconnect">Desconectar</button>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="status" id="status"><span class="dot idle"></span><span id="statusText">Idle</span></div>
+        <span style="margin-left:12px;">Último θ: <b id="lastTheta">—</b> °</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <canvas id="chart" height="280"></canvas>
+    </div>
+
+    <div class="card">
+      <label>Último mensaje recibido</label>
+      <pre id="payload">(esperando datos...)</pre>
+    </div>
+  </div>
+
+<script>
+const ctx=document.getElementById('chart').getContext('2d');
+const data={labels:[],datasets:[{label:'theta_deg',data:[],borderWidth:2,borderColor:'#22d3ee',tension:0.2}]};
+const chart=new Chart(ctx,{type:'line',data,options:{animation:false,scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'#1f2937'}},y:{ticks:{color:'#94a3b8'},grid:{color:'#1f2937'}}}}});
+const $=id=>document.getElementById(id);function setStatus(txt,cls){$('statusText').textContent=txt;const dot=$('status').querySelector('.dot');dot.className='dot '+cls;}
+let client=null;
+function connect(){
+  const host=$('host').value.trim(),port=parseInt($('port').value)||8000,path=$('path').value.trim()||'/mqtt',topic=$('topic').value.trim();
+  const url=`ws://${host}:${port}${path}`;
+  setStatus('Conectando...','idle');
+  client=mqtt.connect(url,{clientId:'webdash-'+Math.random().toString(16).slice(2)});
+  client.on('connect',()=>{setStatus('Conectado','ok');client.subscribe(topic);});
+  client.on('close',()=>setStatus('Desconectado','bad'));
+  client.on('message',(t,p)=>{const txt=p.toString();$('payload').textContent=txt;try{const j=JSON.parse(txt);if(typeof j.theta_deg==='number'){updateChart(j.theta_deg);}}catch{const v=parseFloat(txt);if(!isNaN(v))updateChart(v);}});
+}
+function disconnect(){if(client){client.end(true);client=null;}setStatus('Desconectado','bad');}
+function updateChart(v){$('lastTheta').textContent=v.toFixed(2);data.labels.push('');data.datasets[0].data.push(v);if(data.labels.length>300){data.labels.shift();data.datasets[0].data.shift();}chart.update('none');}
+$('btnConnect').onclick=connect;$('btnDisconnect').onclick=disconnect;
+</script>
+</body>
+</html>
