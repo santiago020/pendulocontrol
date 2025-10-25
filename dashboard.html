@@ -41,10 +41,10 @@ background: radial-gradient(circle, rgba(191, 65, 80, 1) 0%, rgba(0, 0, 0, 1) 10
   <div class="status" id="status">Conectando</div>
   <div id="lastValue">Último θ: -- °</div>
   <canvas id="chart" width="600" height="300"></canvas>
-<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png" 
+  <script>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png" 
      alt="Logo UMNG" 
      style="position: absolute; top: 10px; left: 10px; width: 120px;">
-  <script>
     // ---- Configuración MQTT ----
     const broker = "wss://broker.hivemq.com:8884/mqtt";
     const topic = "pendulo/esp32/imu";
@@ -135,6 +135,7 @@ background: radial-gradient(circle, rgba(191, 65, 80, 1) 0%, rgba(0, 0, 0, 1) 10
   </script>
 </body>
 </html>
+
 
 
 
