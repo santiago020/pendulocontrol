@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>MPU6050 Dashboard IoT</title>
+  <title>pendulo control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -25,7 +25,7 @@
   </style>
 </head>
 <body>
-  <header><h1>Dashboard IoT — Ángulo MPU6050</h1></header>
+  <header><h1>pendulo control</h1></header>
   <div class="wrap">
     <div class="card">
       <div class="row">
@@ -78,7 +78,7 @@ const $=id=>document.getElementById(id);function setStatus(txt,cls){$('statusTex
 let client=null;
 function connect(){
   const host=$('host').value.trim(),port=parseInt($('port').value)||8000,path=$('path').value.trim()||'/mqtt',topic=$('topic').value.trim();
-  const url=`ws://${host}:${port}${path}`;
+  const url=`wss://${host}:${port}${path}`;
   setStatus('Conectando...','idle');
   client=mqtt.connect(url,{clientId:'webdash-'+Math.random().toString(16).slice(2)});
   client.on('connect',()=>{setStatus('Conectado','ok');client.subscribe(topic);});
@@ -91,3 +91,4 @@ $('btnConnect').onclick=connect;$('btnDisconnect').onclick=disconnect;
 </script>
 </body>
 </html>
+
