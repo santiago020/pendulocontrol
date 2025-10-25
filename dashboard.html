@@ -7,8 +7,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
-      background: #f20000;
-background: linear-gradient(90deg, rgba(242, 0, 0, 1) 0%, rgba(179, 57, 57, 1) 50%, rgba(0, 0, 0, 1) 100%);
+background: #bf1d1d;
+background: linear-gradient(90deg, rgba(191, 29, 29, 1) 0%, rgba(158, 71, 71, 1) 50%, rgba(0, 0, 0, 1) 100%);
       color: #e6edf3;
       font-family: 'Segoe UI', sans-serif;
       text-align: center;
@@ -52,7 +52,7 @@ background: linear-gradient(90deg, rgba(242, 0, 0, 1) 0%, rgba(179, 57, 57, 1) 5
     const lastValEl = document.getElementById("lastValue");
 
     client.on("connect", () => {
-      statusEl.textContent = "🟢 Conectado a HiveMQ (broker.hivemq.com)";
+      statusEl.textContent = "🟢 Conectado ";
       client.subscribe(topic);
     });
 
@@ -133,6 +133,7 @@ background: linear-gradient(90deg, rgba(242, 0, 0, 1) 0%, rgba(179, 57, 57, 1) 5
   </script>
 </body>
 </html>
+
 
 
 
