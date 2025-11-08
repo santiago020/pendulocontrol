@@ -11,37 +11,52 @@
       color: #e6edf3;
       font-family: 'Segoe UI', sans-serif;
       text-align: center;
-      padding-top: 140px; /* espacio para el logo fijo */
+      padding-top: 180px; /* espacio para logo + controles fijos */
       margin: 0;
     }
-    h1 {
-      color: #000000;
-      margin-bottom: 10px;
-    }
-    .status {
-      margin-bottom: 10px;
-      font-size: 15px;
-    }
+    h1 { color: #000000; margin: 6px 0 10px; }
+    .status { margin-bottom: 8px; font-size: 15px; }
     canvas {
       background-color: #161b22;
       border-radius: 12px;
       box-shadow: 0 0 10px rgba(0,0,0,0.5);
-      margin-top: 20px;
+      margin-top: 16px;
     }
     #lastValue {
       font-size: 22px;
       font-weight: bold;
-      margin-top: 15px;
+      margin-top: 10px;
       color: #000000;
     }
     /* --- Logo fijo arriba --- */
     .logo-fixed {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      width: 120px;
-      z-index: 10;
+      position: absolute; top: 10px; left: 10px; width: 120px; z-index: 10;
     }
+    /* --- Controles fijos debajo del logo --- */
+    .controls-fixed {
+      position: absolute; top: 20px; left: 150px; right: 10px; z-index: 11;
+      display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;
+    }
+    .control-card {
+      background: rgba(22,27,34,0.85);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: inline-flex; gap: 10px; align-items: center;
+      box-shadow: 0 0 8px rgba(0,0,0,0.3);
+    }
+    .control-card label { font-size: 14px; color: #c9d1d9; }
+    .control-card input[type="number"] {
+      width: 120px; padding: 8px 10px; border-radius: 10px;
+      border: 1px solid #3b3f44; background: #0d1117; color: #e6edf3; font-size: 16px;
+      outline: none;
+    }
+    .control-card button {
+      padding: 8px 14px; border-radius: 10px; border: 1px solid #30363d;
+      background: #238636; color: white; font-weight: 600; cursor: pointer;
+    }
+    .control-card button:disabled { background: #2d333b; cursor: not-allowed; }
+    .sent-badge { font-size: 13px; color: #8b949e; }
   </style>
 </head>
 <body>
@@ -50,6 +65,16 @@
        src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png" 
        alt="Logo UMNG">
 
+  <!-- Controles fijos (entrada numérica y envío MQTT) -->
+  <div class="controls-fixed">
+    <div class="control-card">
+      <label for="refInput">Referencia (°):</label>
+      <input id="refInput" type="number" step="0.1" min="-90" max="90" placeholder="ej. 5.0" />
+      <button id="sendBtn" disabled>Enviar</button>
+      <span id="lastSent" class="sent-badge">Último enviado: --</span>
+    </div>
+  </div>
+
   <h1>PÉNDULO CONTROL</h1>
   <div class="status" id="status">Conectando...</div>
   <div id="lastValue">Último θ: -- °</div>
@@ -57,20 +82,59 @@
 
   <script>
     // ---- Configuración MQTT ----
-    const broker = "wss://broker.hivemq.com:8884/mqtt";
-    const topic  = "pendulo/esp32/imu";
-    const client = mqtt.connect(broker);
+    const broker   = "wss://broker.hivemq.com:8884/mqtt";
+    const topicSub = "pendulo/esp32/imu";   // recibe ángulo
+    const topicPub = "pendulo/esp32/cmd";   // envía referencia/comando
+    const client   = mqtt.connect(broker);
 
-    const statusEl  = document.getElementById("status");
-    const lastValEl = document.getElementById("lastValue");
+    const statusEl   = document.getElementById("status");
+    const lastValEl  = document.getElementById("lastValue");
+    const refInput   = document.getElementById("refInput");
+    const sendBtn    = document.getElementById("sendBtn");
+    const lastSentEl = document.getElementById("lastSent");
 
     client.on("connect", () => {
       statusEl.textContent = "🟢 Conectado";
-      client.subscribe(topic);
+      client.subscribe(topicSub);
+      sendBtn.disabled = false; // habilita envío cuando hay conexión
+    });
+
+    client.on("reconnect", () => {
+      statusEl.textContent = "🟡 Reintentando conexión…";
+      sendBtn.disabled = true;
+    });
+
+    client.on("close", () => {
+      statusEl.textContent = "🟠 Desconectado";
+      sendBtn.disabled = true;
     });
 
     client.on("error", (err) => {
       statusEl.textContent = "🔴 Error de conexión: " + err.message;
+      sendBtn.disabled = true;
+    });
+
+    // ---- Envío de número a la ESP (MQTT publish) ----
+    function publishNumber() {
+      const raw = refInput.value.trim().replace(",", ".");
+      if (raw === "") return;
+      const num = parseFloat(raw);
+      if (isNaN(num)) { alert("Valor inválido."); return; }
+      // Limitar al rango del input
+      const min = parseFloat(refInput.min), max = parseFloat(refInput.max);
+      const clipped = Math.max(min, Math.min(max, num));
+      // Publica como texto, QoS 0, retain true (opcional para que la ESP lea el último)
+      try {
+        client.publish(topicPub, String(clipped), { qos: 0, retain: true });
+        lastSentEl.textContent = `Último enviado: ${clipped}`;
+      } catch (e) {
+        alert("No se pudo enviar: " + e.message);
+      }
+    }
+
+    sendBtn.addEventListener("click", publishNumber);
+    refInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") publishNumber();
     });
 
     // ---- Configuración del gráfico ----
@@ -93,9 +157,7 @@
       data: data,
       options: {
         animation: false,
-        plugins: {
-          legend: { labels: { color: "#e6edf3" } }
-        },
+        plugins: { legend: { labels: { color: "#e6edf3" } } },
         scales: {
           x: {
             title: { display: true, text: "Tiempo (s)", color: "#e6edf3" },
@@ -118,7 +180,6 @@
       const t = ((Date.now() - t0) / 1000).toFixed(1);
       data.labels.push(t);
       data.datasets[0].data.push(value);
-
       if (data.labels.length > 150) {
         data.labels.shift();
         data.datasets[0].data.shift();
@@ -128,6 +189,7 @@
 
     // ---- Recepción de datos MQTT ----
     client.on("message", (topic, message) => {
+      if (topic !== topicSub) return;
       const val = parseFloat(message.toString());
       if (!isNaN(val)) {
         lastValEl.textContent = `Último θ: ${val.toFixed(2)} °`;
