@@ -11,7 +11,7 @@
       color: #e6edf3;
       font-family: 'Segoe UI', sans-serif;
       text-align: center;
-      padding-top: 180px; /* espacio para logo + controles fijos */
+      padding-top: 180px;
       margin: 0;
     }
     h1 { color: #000000; margin: 6px 0 10px; }
@@ -28,11 +28,9 @@
       margin-top: 10px;
       color: #000000;
     }
-    /* --- Logo fijo arriba --- */
     .logo-fixed {
       position: absolute; top: 10px; left: 10px; width: 120px; z-index: 10;
     }
-    /* --- Controles fijos debajo del logo --- */
     .controls-fixed {
       position: absolute; top: 20px; left: 150px; right: 10px; z-index: 11;
       display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;
@@ -60,16 +58,15 @@
   </style>
 </head>
 <body>
-  <!-- Logo fijo UMNG -->
   <img class="logo-fixed" 
        src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png" 
        alt="Logo UMNG">
 
-  <!-- Controles fijos (entrada numérica y envío MQTT) -->
   <div class="controls-fixed">
     <div class="control-card">
       <label for="refInput">Referencia (°):</label>
-      <input id="refInput" type="number" step="0.1" min="-90" max="90" placeholder="ej. 5.0" />
+      <!-- 🔸 Limitado a -10 a 10 -->
+      <input id="refInput" type="number" step="0.1" min="-10" max="10" placeholder="ej. 5.0" inputmode="decimal" />
       <button id="sendBtn" disabled>Enviar</button>
       <span id="lastSent" class="sent-badge">Último enviado: --</span>
     </div>
@@ -81,10 +78,9 @@
   <canvas id="chart" width="600" height="300"></canvas>
 
   <script>
-    // ---- Configuración MQTT ----
     const broker   = "wss://broker.hivemq.com:8884/mqtt";
-    const topicSub = "pendulo/esp32/imu";   // recibe ángulo
-    const topicPub = "pendulo/esp32/cmd";   // envía referencia/comando
+    const topicSub = "pendulo/esp32/imu";
+    const topicPub = "pendulo/esp32/cmd";
     const client   = mqtt.connect(broker);
 
     const statusEl   = document.getElementById("status");
@@ -96,62 +92,29 @@
     client.on("connect", () => {
       statusEl.textContent = "🟢 Conectado";
       client.subscribe(topicSub);
-      sendBtn.disabled = false; // habilita envío cuando hay conexión
+      sendBtn.disabled = false;
     });
+    client.on("reconnect", () => { statusEl.textContent = "🟡 Reintentando conexión…"; sendBtn.disabled = true; });
+    client.on("close", () => { statusEl.textContent = "🟠 Desconectado"; sendBtn.disabled = true; });
+    client.on("error", (err) => { statusEl.textContent = "🔴 Error: " + err.message; sendBtn.disabled = true; });
 
-    client.on("reconnect", () => {
-      statusEl.textContent = "🟡 Reintentando conexión…";
-      sendBtn.disabled = true;
-    });
-
-    client.on("close", () => {
-      statusEl.textContent = "🟠 Desconectado";
-      sendBtn.disabled = true;
-    });
-
-    client.on("error", (err) => {
-      statusEl.textContent = "🔴 Error de conexión: " + err.message;
-      sendBtn.disabled = true;
-    });
-
-    // ---- Envío de número a la ESP (MQTT publish) ----
+    // Envío de número
     function publishNumber() {
       const raw = refInput.value.trim().replace(",", ".");
       if (raw === "") return;
       const num = parseFloat(raw);
       if (isNaN(num)) { alert("Valor inválido."); return; }
-      // Limitar al rango del input
       const min = parseFloat(refInput.min), max = parseFloat(refInput.max);
       const clipped = Math.max(min, Math.min(max, num));
-      // Publica como texto, QoS 0, retain true (opcional para que la ESP lea el último)
-      try {
-        client.publish(topicPub, String(clipped), { qos: 0, retain: true });
-        lastSentEl.textContent = `Último enviado: ${clipped}`;
-      } catch (e) {
-        alert("No se pudo enviar: " + e.message);
-      }
+      client.publish(topicPub, String(clipped), { qos: 0, retain: true });
+      lastSentEl.textContent = `Último enviado: ${clipped}`;
     }
-
     sendBtn.addEventListener("click", publishNumber);
-    refInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") publishNumber();
-    });
+    refInput.addEventListener("keydown", (e) => { if (e.key === "Enter") publishNumber(); });
 
-    // ---- Configuración del gráfico ----
+    // Gráfico
     const ctx = document.getElementById("chart").getContext("2d");
-    const data = {
-      labels: [],
-      datasets: [{
-        label: "Ángulo (°)",
-        data: [],
-        borderColor: "#58a6ff",
-        borderWidth: 2,
-        pointRadius: 0,
-        fill: false,
-        tension: 0.15
-      }]
-    };
-
+    const data = { labels: [], datasets: [{ label: "Ángulo (°)", data: [], borderColor: "#58a6ff", borderWidth: 2, pointRadius: 0, fill: false, tension: 0.15 }] };
     const chart = new Chart(ctx, {
       type: "line",
       data: data,
@@ -159,35 +122,21 @@
         animation: false,
         plugins: { legend: { labels: { color: "#e6edf3" } } },
         scales: {
-          x: {
-            title: { display: true, text: "Tiempo (s)", color: "#e6edf3" },
-            ticks: { color: "#aaa" },
-            grid: { color: "#30363d" }
-          },
-          y: {
-            title: { display: true, text: "Ángulo (°)", color: "#e6edf3" },
-            min: -50, max: 50,
-            ticks: { color: "#aaa" },
-            grid: { color: "#30363d" }
-          }
+          x: { title: { display: true, text: "Tiempo (s)", color: "#e6edf3" }, ticks: { color: "#aaa" }, grid: { color: "#30363d" } },
+          y: { title: { display: true, text: "Ángulo (°)", color: "#e6edf3" }, min: -50, max: 50, ticks: { color: "#aaa" }, grid: { color: "#30363d" } }
         }
       }
     });
-
-    // ---- Actualización del gráfico ----
     let t0 = Date.now();
     function updateChart(value) {
       const t = ((Date.now() - t0) / 1000).toFixed(1);
       data.labels.push(t);
       data.datasets[0].data.push(value);
-      if (data.labels.length > 150) {
-        data.labels.shift();
-        data.datasets[0].data.shift();
-      }
+      if (data.labels.length > 150) { data.labels.shift(); data.datasets[0].data.shift(); }
       chart.update("none");
     }
 
-    // ---- Recepción de datos MQTT ----
+    // Recepción MQTT
     client.on("message", (topic, message) => {
       if (topic !== topicSub) return;
       const val = parseFloat(message.toString());
