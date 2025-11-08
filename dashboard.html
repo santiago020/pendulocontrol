@@ -45,9 +45,9 @@
     }
     .control-card label { font-size: 14px; color: #c9d1d9; }
     .control-card input[type="number"] {
-      width: 120px; padding: 8px 10px; border-radius: 10px;
+      width: 100px; padding: 8px 10px; border-radius: 10px;
       border: 1px solid #3b3f44; background: #0d1117; color: #e6edf3; font-size: 16px;
-      outline: none;
+      outline: none; text-align: center;
     }
     .control-card button {
       padding: 8px 14px; border-radius: 10px; border: 1px solid #30363d;
@@ -55,19 +55,28 @@
     }
     .control-card button:disabled { background: #2d333b; cursor: not-allowed; }
     .sent-badge { font-size: 13px; color: #8b949e; }
+    .range-note {
+      font-size: 13px;
+      color: #c9d1d9;
+      margin-left: 4px;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
+  <!-- Logo UMNG fijo -->
   <img class="logo-fixed" 
        src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png" 
        alt="Logo UMNG">
 
+  <!-- Controles -->
   <div class="controls-fixed">
     <div class="control-card">
       <label for="refInput">Referencia (°):</label>
-      <!-- 🔸 Limitado a -10 a 10 -->
+      <!-- Límite de -10 a 10 -->
       <input id="refInput" type="number" step="0.1" min="-10" max="10" placeholder="ej. 5.0" inputmode="decimal" />
       <button id="sendBtn" disabled>Enviar</button>
+      <span class="range-note">(Solo se aceptan valores entre −10° y 10°)</span>
       <span id="lastSent" class="sent-badge">Último enviado: --</span>
     </div>
   </div>
@@ -98,7 +107,7 @@
     client.on("close", () => { statusEl.textContent = "🟠 Desconectado"; sendBtn.disabled = true; });
     client.on("error", (err) => { statusEl.textContent = "🔴 Error: " + err.message; sendBtn.disabled = true; });
 
-    // Envío de número
+    // Envío MQTT
     function publishNumber() {
       const raw = refInput.value.trim().replace(",", ".");
       if (raw === "") return;
