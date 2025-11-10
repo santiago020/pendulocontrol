@@ -8,74 +8,49 @@
   <style>
     body {
       background: radial-gradient(circle, rgba(191,65,80,1) 0%, rgba(0,0,0,1) 100%);
-      color: #e6edf3;
-      font-family: 'Segoe UI', sans-serif;
-      text-align: center;
-      padding-top: 180px;
-      margin: 0;
+      color: #e6edf3; font-family: 'Segoe UI', sans-serif; text-align: center;
+      padding-top: 190px; margin: 0;
     }
     h1 { color: #000000; margin: 6px 0 10px; }
     .status { margin-bottom: 8px; font-size: 15px; }
-    canvas {
-      background-color: #161b22;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.5);
-      margin-top: 16px;
-    }
-    #lastValue {
-      font-size: 22px;
-      font-weight: bold;
-      margin-top: 10px;
-      color: #000000;
-    }
-    .logo-fixed {
-      position: absolute; top: 10px; left: 10px; width: 120px; z-index: 10;
-    }
+    canvas { background:#161b22; border-radius:12px; box-shadow:0 0 10px rgba(0,0,0,.5); margin-top:16px; }
+    #lastValue { font-size:22px; font-weight:bold; margin-top:10px; color:#000000; }
+    .logo-fixed { position:absolute; top:10px; left:10px; width:120px; z-index:10; }
     .controls-fixed {
-      position: absolute; top: 20px; left: 150px; right: 10px; z-index: 11;
-      display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;
+      position:absolute; top:20px; left:150px; right:10px; z-index:11;
+      display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap;
     }
     .control-card {
-      background: rgba(22,27,34,0.85);
-      border: 1px solid #30363d;
-      border-radius: 12px;
-      padding: 10px 12px;
-      display: inline-flex; gap: 10px; align-items: center;
-      box-shadow: 0 0 8px rgba(0,0,0,0.3);
+      background: rgba(22,27,34,.85); border:1px solid #30363d; border-radius:12px;
+      padding:10px 12px; display:inline-flex; gap:10px; align-items:center;
+      box-shadow:0 0 8px rgba(0,0,0,.3);
     }
-    .control-card label { font-size: 14px; color: #c9d1d9; }
+    .control-card label { font-size:14px; color:#c9d1d9; }
     .control-card input[type="number"] {
-      width: 100px; padding: 8px 10px; border-radius: 10px;
-      border: 1px solid #3b3f44; background: #0d1117; color: #e6edf3; font-size: 16px;
-      outline: none; text-align: center;
+      width:100px; padding:8px 10px; border-radius:10px; border:1px solid #3b3f44;
+      background:#0d1117; color:#e6edf3; font-size:16px; outline:none; text-align:center;
     }
-    .control-card button {
-      padding: 8px 14px; border-radius: 10px; border: 1px solid #30363d;
-      background: #238636; color: white; font-weight: 600; cursor: pointer;
+    .btn {
+      padding:8px 14px; border-radius:10px; border:1px solid #30363d;
+      background:#238636; color:white; font-weight:600; cursor:pointer;
     }
-    .control-card button:disabled { background: #2d333b; cursor: not-allowed; }
-    .sent-badge { font-size: 13px; color: #8b949e; }
-    .range-note {
-      font-size: 13px;
-      color: #c9d1d9;
-      margin-left: 4px;
-      font-style: italic;
-    }
+    .btn:disabled { background:#2d333b; cursor:not-allowed; }
+    .btn.secondary { background:#0969da; }
+    .sent-badge { font-size:13px; color:#8b949e; }
+    .range-note { font-size:13px; color:#c9d1d9; margin-left:4px; font-style:italic; }
   </style>
 </head>
 <body>
-  <!-- Logo UMNG fijo -->
-  <img class="logo-fixed" 
-       src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png" 
+  <img class="logo-fixed"
+       src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Escudo_Universidad_Militar_Nueva_Granada.svg/958px-Escudo_Universidad_Militar_Nueva_Granada.svg.png"
        alt="Logo UMNG">
 
-  <!-- Controles -->
   <div class="controls-fixed">
     <div class="control-card">
       <label for="refInput">Referencia (°):</label>
-      <!-- Límite de -10 a 10 -->
       <input id="refInput" type="number" step="0.1" min="-10" max="10" placeholder="ej. 5.0" inputmode="decimal" />
-      <button id="sendBtn" disabled>Enviar</button>
+      <button id="sendBtn" class="btn" disabled>Enviar</button>
+      <button id="zeroBtn" class="btn secondary" disabled>Cero (Z)</button>
       <span class="range-note">(Solo se aceptan valores entre −10° y 10°)</span>
       <span id="lastSent" class="sent-badge">Último enviado: --</span>
     </div>
@@ -96,18 +71,19 @@
     const lastValEl  = document.getElementById("lastValue");
     const refInput   = document.getElementById("refInput");
     const sendBtn    = document.getElementById("sendBtn");
+    const zeroBtn    = document.getElementById("zeroBtn");
     const lastSentEl = document.getElementById("lastSent");
 
     client.on("connect", () => {
       statusEl.textContent = "🟢 Conectado";
       client.subscribe(topicSub);
       sendBtn.disabled = false;
+      zeroBtn.disabled = false;
     });
-    client.on("reconnect", () => { statusEl.textContent = "🟡 Reintentando conexión…"; sendBtn.disabled = true; });
-    client.on("close", () => { statusEl.textContent = "🟠 Desconectado"; sendBtn.disabled = true; });
-    client.on("error", (err) => { statusEl.textContent = "🔴 Error: " + err.message; sendBtn.disabled = true; });
+    client.on("reconnect", () => { statusEl.textContent = "🟡 Reintentando conexión…"; sendBtn.disabled = true; zeroBtn.disabled = true; });
+    client.on("close", () => { statusEl.textContent = "🟠 Desconectado"; sendBtn.disabled = true; zeroBtn.disabled = true; });
+    client.on("error", (err) => { statusEl.textContent = "🔴 Error: " + err.message; sendBtn.disabled = true; zeroBtn.disabled = true; });
 
-    // Envío MQTT
     function publishNumber() {
       const raw = refInput.value.trim().replace(",", ".");
       if (raw === "") return;
@@ -118,8 +94,19 @@
       client.publish(topicPub, String(clipped), { qos: 0, retain: true });
       lastSentEl.textContent = `Último enviado: ${clipped}`;
     }
+    function publishZero() {
+      client.publish(topicPub, "Z", { qos: 0, retain: false });
+      lastSentEl.textContent = `Último enviado: Z (cero)`;
+    }
+
     sendBtn.addEventListener("click", publishNumber);
-    refInput.addEventListener("keydown", (e) => { if (e.key === "Enter") publishNumber(); });
+    zeroBtn.addEventListener("click", publishZero);
+
+    // Enter envía número; tecla Z envía cero
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") publishNumber();
+      if (e.key === "z" || e.key === "Z") publishZero();
+    });
 
     // Gráfico
     const ctx = document.getElementById("chart").getContext("2d");
@@ -144,8 +131,6 @@
       if (data.labels.length > 150) { data.labels.shift(); data.datasets[0].data.shift(); }
       chart.update("none");
     }
-
-    // Recepción MQTT
     client.on("message", (topic, message) => {
       if (topic !== topicSub) return;
       const val = parseFloat(message.toString());
